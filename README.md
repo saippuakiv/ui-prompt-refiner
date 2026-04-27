@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ui-prompt-refiner
 
-## Getting Started
+Iteratively refine rough UI descriptions into clear, actionable prompts through suggestion and merging.
 
-First, run the development server:
+## How it works
+
+1. Type a rough UI idea (e.g. "a dropdown menu")
+2. Press Enter or click **Improve** to get refined suggestions
+3. Select a suggestion — it merges with your original input into a precise prompt
+4. Repeat until satisfied, then copy the result
+
+## Tech stack
+
+- Next.js 16
+- React 19
+- Tailwind CSS 4
+- Claude (Haiku 4.5) via Anthropic API
+
+## Setup
+
+```bash
+npm install
+```
+
+Create a `.env.local` file:
+
+```
+ANTHROPIC_API_KEY=your-api-key
+```
+
+For development without API calls:
+
+```
+USE_MOCK=true
+```
+
+## Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API routes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/suggestions` | POST | Generates 3-6 refined suggestions from a rough input |
+| `/api/merge` | POST | Merges the original input with a selected suggestion |
 
-## Learn More
+Both routes share a rate limit of 10 requests per minute.
 
-To learn more about Next.js, take a look at the following resources:
+## Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Glassmorphism UI with smooth animations
+- Keyboard navigation (arrow keys, Enter, Escape)
+- Undo history
+- Copy to clipboard
+- Loading states with progress messages
+- Error handling with retry
+- Rate limiting
