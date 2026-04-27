@@ -1,65 +1,189 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { GradientBackground } from '@/components/GradientBackground';
+import { PopMenu, type SuggestionItem } from '@/components/PopMenu';
+import { TextareaCard } from '@/components/TextareaCard';
 
 export default function Home() {
+  const [value, setValue] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<SuggestionItem[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [history, setHistory] = useState<string[]>([]);
+  const [originalInput, setOriginalInput] = useState('');
+  const [merging, setMerging] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const phaseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearPhaseTimer = () => {
+    if (phaseTimerRef.current) {
+      clearInterval(phaseTimerRef.current);
+      phaseTimerRef.current = null;
+    }
+  };
+
+  const fetchSuggestions = useCallback(async () => {
+    if (!value.trim()) return;
+    setOriginalInput(value.trim());
+    setMenuOpen(true);
+    setLoading(true);
+    setLoadingPhase(0);
+    setError(null);
+    setItems([]);
+    setSelectedIndex(0);
+
+    clearPhaseTimer();
+    phaseTimerRef.current = setInterval(() => {
+      setLoadingPhase((prev) => Math.min(prev + 1, 2));
+    }, 3000);
+
+    try {
+      const res = await fetch('/api/suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: value.trim() }),
+      });
+      const data = await res.json();
+      const suggestions = data.suggestions ?? data;
+      if (!Array.isArray(suggestions)) {
+        console.error('[suggestions] Invalid response:', data);
+        setError('Something went wrong. Please try again.');
+        return;
+      }
+      setItems(suggestions);
+      setSelectedIndex(0);
+    } catch {
+      setError('Could not connect. Please check your network.');
+    } finally {
+      setLoading(false);
+      clearPhaseTimer();
+    }
+  }, [value]);
+
+  useEffect(() => {
+    return () => clearPhaseTimer();
+  }, []);
+
+  const hideMenu = useCallback(() => {
+    setMenuOpen(false);
+    setSelectedIndex(0);
+    setError(null);
+  }, []);
+
+  const handleSelect = useCallback(
+    async (item: SuggestionItem) => {
+      hideMenu();
+      setHistory((prev) => [...prev, value]);
+      setMerging(true);
+      setValue('Refining...');
+
+      try {
+        const res = await fetch('/api/merge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ original: originalInput, selected: item.label }),
+        });
+        const data = await res.json();
+        if (data.merged) {
+          setValue(data.merged);
+        } else {
+          setValue(item.label);
+        }
+      } catch {
+        setValue(item.label);
+      } finally {
+        setMerging(false);
+        textareaRef.current?.focus();
+      }
+    },
+    [hideMenu, value, originalInput],
+  );
+
+  const handleUndo = useCallback(() => {
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    setHistory((h) => h.slice(0, -1));
+    setValue(prev);
+    textareaRef.current?.focus();
+  }, [history]);
+
+  const handleCopy = useCallback(() => {
+    if (value.trim()) {
+      navigator.clipboard.writeText(value);
+    }
+  }, [value]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (menuOpen && !loading && !error) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.max(0, prev - 1));
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (items[selectedIndex]) handleSelect(items[selectedIndex]);
+        return;
+      }
+    }
+
+    if (e.key === 'Escape' && menuOpen) {
+      e.preventDefault();
+      hideMenu();
+      return;
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey && !menuOpen) {
+      e.preventDefault();
+      fetchSuggestions();
+    }
+  };
+
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    if (menuOpen) hideMenu();
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className='flex-1 flex items-center justify-end flex-col pb-[12vh] p-6 relative'>
+      <GradientBackground />
+
+      <div ref={containerRef} className='relative w-full max-w-[620px] z-10'>
+        <PopMenu
+          items={items}
+          visible={menuOpen}
+          loading={loading}
+          loadingPhase={loadingPhase}
+          error={error}
+          selectedIndex={selectedIndex}
+          onSelect={handleSelect}
+          onHover={setSelectedIndex}
+          onRetry={fetchSuggestions}
+          onClose={hideMenu}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        <TextareaCard
+          ref={textareaRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onSubmit={fetchSuggestions}
+          onUndo={handleUndo}
+          onCopy={handleCopy}
+          canUndo={history.length > 0}
+          merging={merging}
+        />
+      </div>
+    </main>
   );
 }
