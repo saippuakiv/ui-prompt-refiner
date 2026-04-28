@@ -1,15 +1,15 @@
-import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Geist } from 'next/font/google';
+import './globals.css';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "Input Pop Menu",
-  description: "iOS Liquid Glass Input with Pop Menu",
+  title: 'UI prompt refiner',
+  description: 'iOS Liquid Glass Input with Pop Menu',
 };
 
 export default function RootLayout({
@@ -18,8 +18,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang='en' className={`${geistSans.variable} h-full antialiased`}>
+      <body className='min-h-full flex flex-col'>{children}</body>
     </html>
   );
 }
